@@ -1,3 +1,5 @@
+*.onnx
+*.pt
 *.png
 **.gif
 .vscode/

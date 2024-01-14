@@ -121,6 +121,24 @@ class ZoeDepth(DepthModel):
         self.conditional_log_binomial = ConditionalLogBinomial(
             last_in, bin_embedding_dim, n_classes=n_bins, min_temp=min_temp, max_temp=max_temp)
 
+    def printstuff(self):
+        # input_shape = (1, 3, 193, 260)
+        # x = torch.ones(input_shape)
+
+        # b, c, h, w = x.shape
+        # # print("input shape ", x.shape)
+        # self.orig_input_width = w
+        # self.orig_input_height = h
+        # rel_depth, out = self.core(x, denorm=False, return_rel_depth=True)
+        # # print("output shapes", rel_depth.shape, out.shape)
+
+        # outconv_activation = out[0]
+        # btlnck = out[1]
+        # x_blocks = out[2:]
+
+        # print ("%i, %i, %i,", self.projectors, self.attractors, x_blocks)
+        print(self.loop_input)
+
     def forward(self, x, return_final_centers=False, denorm=False, return_probs=False, **kwargs):
         """
         Args:
@@ -160,8 +178,21 @@ class ZoeDepth(DepthModel):
 
         prev_b_embedding = self.seed_projector(x)
 
+
+        loop_input = []
+
         # unroll this loop for better performance
         for projector, attractor, x in zip(self.projectors, self.attractors, x_blocks):
+            r = [projector, attractor, x]
+            loop_input.append(r)
+
+        self.loop_input = loop_input
+
+        for input in loop_input:
+            projector = input[0]
+            attractor = input[1]
+            x = input[2]
+
             b_embedding = projector(x)
             b, b_centers = attractor(
                 b_embedding, b_prev, prev_b_embedding, interpolate=True)
@@ -192,14 +223,14 @@ class ZoeDepth(DepthModel):
         out = torch.sum(x * b_centers, dim=1, keepdim=True)
 
         # Structure output dict
-        output = dict(metric_depth=out)
-        if return_final_centers or return_probs:
-            output['bin_centers'] = b_centers
+        # output = dict(metric_depth=out)
+        # if return_final_centers or return_probs:
+        #     output['bin_centers'] = b_centers
 
-        if return_probs:
-            output['probs'] = x
+        # if return_probs:
+        #     output['probs'] = x
 
-        return output
+        return out
 
     def get_lr_params(self, lr):
         """

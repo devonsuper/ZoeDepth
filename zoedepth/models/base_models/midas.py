@@ -97,15 +97,15 @@ class Resize(object):
         self.__multiple_of = ensure_multiple_of
         self.__resize_method = resize_method
 
-    def constrain_to_multiple_of(self, x, min_val=0, max_val=None):
-        y = (np.round(x / self.__multiple_of) * self.__multiple_of).astype(int)
+    def constrain_to_multiple_of(self, input, min_val=0, max_val=None):
+        y = (np.round(input / self.__multiple_of) * self.__multiple_of).astype(int)
 
         if max_val is not None and y > max_val:
-            y = (np.floor(x / self.__multiple_of)
+            y = (np.floor(input / self.__multiple_of)
                  * self.__multiple_of).astype(int)
 
         if y < min_val:
-            y = (np.ceil(x / self.__multiple_of)
+            y = (np.ceil(input / self.__multiple_of)
                  * self.__multiple_of).astype(int)
 
         return y
@@ -169,7 +169,11 @@ class Resize(object):
         return (new_width, new_height)
 
     def __call__(self, x):
-        width, height = self.get_size(*x.shape[-2:][::-1])
+        width, height = list(x.size()[-2:][::-1])
+        width = int(width)
+        height = int(height)
+        
+        width, height = self.get_size(width, height)
         return nn.functional.interpolate(x, (height, width), mode='bilinear', align_corners=True)
 
 class PrepForMidas(object):
@@ -262,7 +266,7 @@ class MidasCore(nn.Module):
             x = self.prep(x)
             # print("Shape after prep: ", x.shape)
 
-        with torch.set_grad_enabled(self.trainable):
+        with torch.no_grad():#set_grad_enabled(self.trainable):
 
             # print("Input size to Midascore", x.shape)
             rel_depth = self.core(x)
@@ -338,7 +342,22 @@ class MidasCore(nn.Module):
             kwargs = MidasCore.parse_img_size(kwargs)
         img_size = kwargs.pop("img_size", [384, 384])
         print("img_size", img_size)
-        midas = torch.hub.load("intel-isl/MiDaS", midas_model_type,
+
+
+        #https://github.com/parkchamchi/MiDaS/blob/master/tf/make_onnx_model.py
+        class View(nn.Module):
+            def __init__(self, dim,  shape):
+                super(View, self).__init__()
+                self.dim = dim
+                self.shape = shape
+
+            def forward(self, input):
+                new_shape = list(input.shape)[:self.dim] + list(self.shape) + list(input.shape)[self.dim+1:]
+                return input.view(*new_shape)
+
+        torch.nn.Unflatten = View
+
+        midas = torch.hub.load("parkchamchi/MiDaS", midas_model_type,
                                pretrained=use_pretrained_midas, force_reload=force_reload)
         kwargs.update({'keep_aspect_ratio': force_keep_ar})
         midas_core = MidasCore(midas, trainable=train_midas, fetch_features=fetch_features,

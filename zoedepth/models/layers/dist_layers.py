@@ -107,7 +107,7 @@ class ConditionalLogBinomial(nn.Module):
         Returns:
             torch.Tensor: Output log binomial distribution
         """
-        pt = self.mlp(torch.concat((x, cond), dim=1))
+        pt = self.mlp(torch.cat((x, cond), dim=1))
         p, t = pt[:, :2, ...], pt[:, 2:, ...]
 
         p = p + self.p_eps
